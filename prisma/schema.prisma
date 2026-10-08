@@ -1,0 +1,116 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// =============================================================
+// ENUMS
+// =============================================================
+
+enum OrderStatus {
+  CREATED
+  PAYMENT_PENDING
+  PAID
+  PRINTING
+  COMPLETED
+  PAYMENT_FAILED
+  PRINT_FAILED
+  CANCELLED
+}
+
+enum PrintJobStatus {
+  PENDING
+  PRINTING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PaperSize {
+  A4
+  A3
+}
+
+enum ColorMode {
+  BW
+  COLOR
+}
+
+enum AuditEventType {
+  ORDER_CREATED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  PRINT_STARTED
+  PRINT_COMPLETED
+  PRINT_FAILED
+  ORDER_CANCELLED
+  STATUS_UPDATED
+}
+
+// =============================================================
+// MODELS
+// =============================================================
+
+model Order {
+  id         String      @id @default(uuid()) @db.Uuid
+  orderId    String      @unique @map("order_id") @db.VarChar(32)
+  customerId String      @map("customer_id") @db.VarChar(64)
+  kioskId    String      @map("kiosk_id") @db.VarChar(64)
+  fileUrl    String      @map("file_url") @db.Text
+  copies     Int         @db.Integer
+  paperSize  PaperSize   @map("paper_size")
+  colorMode  ColorMode   @map("color_mode")
+  price      Decimal     @db.Decimal(10, 2)
+  status     OrderStatus @default(CREATED)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // 1-to-1 relationship with PrintJob
+  printJob   PrintJob?
+
+  // 1-to-many relationship with AuditLog
+  auditLogs  AuditLog[]
+
+  @@index([customerId], name: "idx_orders_customer_id")
+  @@index([kioskId], name: "idx_orders_kiosk_id")
+  @@index([status], name: "idx_orders_status")
+  @@index([createdAt], name: "idx_orders_created_at")
+  @@map("orders")
+}
+
+model PrintJob {
+  id          String         @id @default(uuid()) @db.Uuid
+  orderId     String         @unique @map("order_id") @db.VarChar(32)
+  kioskId     String         @map("kiosk_id") @db.VarChar(64)
+  status      PrintJobStatus @default(PENDING)
+  startedAt   DateTime?      @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime?      @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order       Order          @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@index([kioskId], name: "idx_print_jobs_kiosk_id")
+  @@index([status], name: "idx_print_jobs_status")
+  @@map("print_jobs")
+}
+
+model AuditLog {
+  id        String         @id @default(uuid()) @db.Uuid
+  orderId   String         @map("order_id") @db.VarChar(32)
+  kioskId   String         @map("kiosk_id") @db.VarChar(64)
+  userId    String?        @map("user_id") @db.VarChar(64)
+  event     AuditEventType
+  metadata  Json?          @db.JsonB
+  timestamp DateTime       @default(now()) @db.Timestamptz(6)
+
+  order     Order          @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@index([orderId, timestamp], name: "idx_audit_logs_order_id_timestamp")
+  @@index([event], name: "idx_audit_logs_event")
+  @@map("audit_logs")
+}

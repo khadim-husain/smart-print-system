@@ -1,0 +1,54 @@
+{
+  "name": "smart-print-system",
+  "version": "1.0.0",
+  "description": "Production-grade backend system for multi-kiosk printing order and lifecycle management",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "dotenv -e .env.test -- jest --runInBand --detectOpenHandles --forceExit",
+    "test:watch": "dotenv -e .env.test -- jest --watch --runInBand",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:studio": "prisma studio"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.17.6",
+    "@types/supertest": "^6.0.2",
+    "dotenv-cli": "^7.4.4",
+    "eslint": "^9.14.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.3.3",
+    "prisma": "^5.22.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.13.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "private": true
+}

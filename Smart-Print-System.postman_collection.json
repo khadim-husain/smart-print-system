@@ -1,0 +1,273 @@
+{
+  "info": {
+    "_postman_id": "9b1e84fc-92ab-467f-b52b-741a382cf891",
+    "name": "Smart Print Order & Job Management System",
+    "description": "Production-grade REST API collection for multi-kiosk printing platform with state machine validation, dynamic pricing, and PostgreSQL audit logging.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "ORD-20261008-000001",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Checks system availability and PostgreSQL database connectivity status."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "1. Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.orderId) {",
+                  "    pm.collectionVariables.set('orderId', jsonData.data.orderId);",
+                  "    console.log('Set orderId to:', jsonData.data.orderId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"CUS001\",\n  \"kioskId\": \"KIOSK001\",\n  \"fileUrl\": \"https://example.com/documents/presentation.pdf\",\n  \"copies\": 3,\n  \"paperSize\": \"A4\",\n  \"colorMode\": \"BW\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            },
+            "description": "Creates an order atomically with print job and ORDER_CREATED audit log. Price is calculated server-side (3 * ₹2 = ₹6)."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}"]
+            },
+            "description": "Retrieves comprehensive order details, pricing, current status, and associated print job."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Update Status (Move to PAYMENT_PENDING)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PAYMENT_PENDING\",\n  \"userId\": \"CUS001\",\n  \"note\": \"Customer initiated checkout screen\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "status"]
+            },
+            "description": "Transitions state through the state machine guard from CREATED to PAYMENT_PENDING."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Process Payment (Success -> PAID)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"success\": true,\n  \"userId\": \"CUS001\",\n  \"transactionRef\": \"UPI-REC-908273615\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "payment"]
+            },
+            "description": "Simulates successful payment: PAYMENT_PENDING -> PAID and creates PAYMENT_SUCCESS audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Process Payment (Failure -> PAYMENT_FAILED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"success\": false,\n  \"userId\": \"CUS001\",\n  \"transactionRef\": \"FAIL-CARD-DECLINED-99\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/payment",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "payment"]
+            },
+            "description": "Simulates payment gateway rejection: PAYMENT_PENDING -> PAYMENT_FAILED and creates PAYMENT_FAILED audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "6. Start Printing (PAID -> PRINTING)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"trayNumber\": \"Tray-1\",\n  \"userId\": \"KIOSK_AGENT_01\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/print",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "print"]
+            },
+            "description": "Initiates print hardware spooler: PAID -> PRINTING and creates PRINT_STARTED audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "7. Complete Printing (PRINTING -> COMPLETED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"KIOSK_HARDWARE_DAEMON\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/print/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "print", "complete"]
+            },
+            "description": "Finalizes print job: PRINTING -> COMPLETED (Terminal State) and creates PRINT_COMPLETED audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "8. Fail Printing (PRINTING -> PRINT_FAILED)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Paper jam detected in feed roller\",\n  \"errorCode\": \"ERR_PAPER_JAM_TRAY1\",\n  \"userId\": \"KIOSK_SYS_MONITOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/print/fail",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "print", "fail"]
+            },
+            "description": "Marks hardware error: PRINTING -> PRINT_FAILED (Terminal State) and creates PRINT_FAILED audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "9. Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"CUS001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "cancel"]
+            },
+            "description": "Cancels active order from CREATED, PAYMENT_PENDING, or PAID and creates ORDER_CANCELLED audit log."
+          },
+          "response": []
+        },
+        {
+          "name": "10. Get Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/{{orderId}}/audit-logs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", "{{orderId}}", "audit-logs"]
+            },
+            "description": "Fetches all immutable audit records for the order in chronological order."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
