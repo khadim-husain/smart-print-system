@@ -25,5 +25,7 @@ Thumbs.db
 # IDE Files
 .vscode/
 .idea/
+.postman/
+postman/
 *.swp
 *.swo
